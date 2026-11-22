@@ -1,0 +1,15 @@
+{
+  "domain": "inels_ir",
+  "name": "iNELS IR",
+  "codeowners": [],
+  "config_flow": true,
+  "dhcp": [
+    {
+      "macaddress": "2C6A6F*"
+    }
+  ],
+  "documentation": "https://www.elkoep.cz/chytra-krabicka-elan-ir-003-/manual",
+  "integration_type": "hub",
+  "iot_class": "local_polling",
+  "version": "0.5.1"
+}

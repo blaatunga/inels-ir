@@ -1,0 +1,79 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Přidat iNELS IR",
+        "description": "Zadejte adresu krabičky. Zařízení, tlačítka a IR kódy se načtou z její paměti.",
+        "data": {
+          "host": "Adresa krabičky",
+          "username": "Účet správce krabičky",
+          "password": "Heslo správce krabičky"
+        },
+        "data_description": {
+          "password": "Pro učení zadejte účet a heslo správce. Prázdné heslo ponechá uložené heslo při stejné adrese i účtu. Ponecháte-li obě pole prázdná, uložené údaje se odstraní."
+        }
+      },
+      "reconfigure": {
+        "title": "Přenastavit iNELS IR",
+        "description": "Zadejte adresu krabičky. Zařízení, tlačítka a IR kódy se načtou z její paměti.",
+        "data": {
+          "host": "Adresa krabičky",
+          "username": "Účet správce krabičky",
+          "password": "Heslo správce krabičky"
+        },
+        "data_description": {
+          "password": "Pro učení zadejte účet a heslo správce. Prázdné heslo ponechá uložené heslo při stejné adrese i účtu. Ponecháte-li obě pole prázdná, uložené údaje se odstraní."
+        }
+      },
+      "confirm": {
+        "title": "Přidat nalezenou krabičku",
+        "description": "Přidat iNELS IR na adrese {host}?"
+      }
+    },
+    "error": {
+      "invalid_host": "Zadejte IP adresu, název zařízení nebo adresu HTTP.",
+      "missing_credentials": "Zadejte účet i heslo správce, nebo obě pole nechte prázdná.",
+      "not_supported": "Na této adrese se nepodařilo ověřit eLAN-IR-003.",
+      "private_address_required": "Pro učení použijte privátní IP adresu krabičky.",
+      "gateway_changed": "Na této adrese odpověděla jiná krabička."
+    },
+    "abort": {
+      "already_configured": "Tato krabička už je přidaná.",
+      "reconfigure_successful": "Nastavení iNELS IR bylo aktualizováno.",
+      "not_supported": "Na této adrese se nepodařilo ověřit eLAN-IR-003."
+    },
+    "flow_title": "iNELS IR ({host})"
+  },
+  "services": {
+    "learn_code": {
+      "name": "Naučit IR kód",
+      "description": "Spusťte akci a stiskněte tlačítko na ovladači namířeném na čidlo IR LEARN.",
+      "fields": {
+        "config_entry": {
+          "name": "Krabička"
+        },
+        "button_name": {
+          "name": "Název tlačítka"
+        },
+        "device_name": {
+          "name": "Název spotřebiče"
+        },
+        "ir_output": {
+          "name": "IR výstup"
+        }
+      }
+    }
+  },
+  "entity": {
+    "button": {
+      "refresh_catalog": {
+        "name": "Načíst konfiguraci z krabičky"
+      }
+    }
+  },
+  "exceptions": {
+    "catalog_refresh_failed": {
+      "message": "Katalog se nepodařilo načíst. Zkontrolujte dostupnost krabičky a zkuste to znovu."
+    }
+  }
+}

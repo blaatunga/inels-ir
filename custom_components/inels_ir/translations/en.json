@@ -1,0 +1,79 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add iNELS IR",
+        "description": "Enter the gateway address. Devices, buttons and IR codes are loaded from the gateway.",
+        "data": {
+          "host": "Gateway address",
+          "username": "Gateway administrator",
+          "password": "Gateway administrator password"
+        },
+        "data_description": {
+          "password": "Set the administrator credentials to learn codes. A blank password keeps the saved password for the same address and account. Clear both fields to remove the stored credentials."
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure iNELS IR",
+        "description": "Enter the gateway address. Devices, buttons and IR codes are loaded from the gateway.",
+        "data": {
+          "host": "Gateway address",
+          "username": "Gateway administrator",
+          "password": "Gateway administrator password"
+        },
+        "data_description": {
+          "password": "Set the administrator credentials to learn codes. A blank password keeps the saved password for the same address and account. Clear both fields to remove the stored credentials."
+        }
+      },
+      "confirm": {
+        "title": "Add discovered gateway",
+        "description": "Add iNELS IR at {host}?"
+      }
+    },
+    "error": {
+      "invalid_host": "Enter a hostname, IP address or HTTP origin.",
+      "missing_credentials": "Enter both administrator credentials or leave both fields blank.",
+      "not_supported": "Could not verify an eLAN-IR-003 at this address.",
+      "private_address_required": "Use the gateway's private IP address for learning.",
+      "gateway_changed": "A different gateway responded at this address."
+    },
+    "abort": {
+      "already_configured": "This gateway is already configured.",
+      "reconfigure_successful": "iNELS IR was updated.",
+      "not_supported": "Could not verify an eLAN-IR-003 at this address."
+    },
+    "flow_title": "iNELS IR ({host})"
+  },
+  "services": {
+    "learn_code": {
+      "name": "Learn IR code",
+      "description": "Run the action and press a button on the remote pointed at the IR LEARN sensor.",
+      "fields": {
+        "config_entry": {
+          "name": "Gateway"
+        },
+        "button_name": {
+          "name": "Button name"
+        },
+        "device_name": {
+          "name": "Appliance name"
+        },
+        "ir_output": {
+          "name": "IR output"
+        }
+      }
+    }
+  },
+  "entity": {
+    "button": {
+      "refresh_catalog": {
+        "name": "Refresh gateway configuration"
+      }
+    }
+  },
+  "exceptions": {
+    "catalog_refresh_failed": {
+      "message": "Could not read the catalog. Check that the gateway is reachable and try again."
+    }
+  }
+}
