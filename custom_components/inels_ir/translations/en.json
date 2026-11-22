@@ -91,7 +91,9 @@
         "title": "IR management",
         "menu_options": {
           "learn": "Learn a new IR code",
-          "assign": "Create an action from a stored code"
+          "assign": "Create an action from a stored code",
+          "edit_device": "Edit remote",
+          "edit_action": "Edit button"
         }
       },
       "learn": {
@@ -111,6 +113,38 @@
           "ir_output": "IR output",
           "ir_slot": "Existing IR slot"
         }
+      },
+      "edit_device": {
+        "title": "Edit remote",
+        "data": {
+          "device_id": "Remote"
+        }
+      },
+      "edit_action": {
+        "title": "Edit button",
+        "data": {
+          "device_id": "Remote"
+        }
+      },
+      "device_metadata": {
+        "title": "Edit remote",
+        "data": {
+          "label": "Remote name",
+          "product": "Product",
+          "manufacturer": "Manufacturer",
+          "description": "Description",
+          "device_type": "Device type"
+        }
+      },
+      "action_details": {
+        "title": "Edit button",
+        "description": "Leave fields blank to keep current values. Selecting a slot replaces the existing sequence with one code. Renaming a primary action can affect gateway scenes and HA automations.",
+        "data": {
+          "action_id": "Button",
+          "label": "New name",
+          "ir_output": "New IR output",
+          "ir_slot": "Replacement IR slot"
+        }
       }
     },
     "progress": {
@@ -122,6 +156,9 @@
       "credentials_required": "Enter the gateway administrator credentials under Reconfigure.",
       "saved_on_gateway": "Saved to the gateway.",
       "gateway_operation_failed": "The gateway operation could not finish. {error}"
+    },
+    "error": {
+      "invalid_text": "Enter plain text without HTML characters."
     }
   }
 }

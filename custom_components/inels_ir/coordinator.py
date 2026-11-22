@@ -12,10 +12,22 @@ from homeassistant.const import CONF_HOST, CONF_MAC
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import DOMAIN, GatewayError, device_actions, gateway_session, identify_gateway
+from .api import (
+    DOMAIN, GatewayError, device_actions, device_metadata, device_name_from_record,
+    gateway_session, identify_gateway,
+)
 from .api import read_devices, read_slots
 
 _LOGGER = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class RemoteControl:
+    """A remote configured on the gateway."""
+
+    name: str
+    actions: dict[str, str]
+    metadata: dict[str, str]
 
 
 @dataclass(frozen=True)
@@ -23,7 +35,7 @@ class Catalog:
     """Slots and device actions read from the gateway."""
 
     slots: tuple[int, ...]
-    devices: dict[str, tuple[str, dict[str, str]]]
+    devices: dict[str, RemoteControl]
 
 
 class GatewayCoordinator(DataUpdateCoordinator[Catalog]):
@@ -48,13 +60,14 @@ class GatewayCoordinator(DataUpdateCoordinator[Catalog]):
                     raise GatewayError("Gateway identity changed")
                 slots = await read_slots(session, self.origin)
                 records = await read_devices(session, self.origin)
-                devices = {}
-                for device_id, record in records.items():
-                    label = record["device info"].get("label")
-                    devices[device_id] = (
-                        label if isinstance(label, str) and label.strip() else device_id,
+                devices = {
+                    device_id: RemoteControl(
+                        device_name_from_record(record, device_id),
                         device_actions(record),
+                        device_metadata(record),
                     )
+                    for device_id, record in records.items()
+                }
                 return Catalog(slots, devices)
         except (ClientError, TimeoutError, ValueError, GatewayError) as err:
             detail = str(err) if isinstance(err, GatewayError) else type(err).__name__

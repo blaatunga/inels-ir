@@ -1,6 +1,7 @@
 """HTTP transport and configuration validation for eLAN-IR-003."""
 
 from asyncio import IncompleteReadError
+from contextlib import asynccontextmanager
 from ipaddress import ip_address, ip_network
 import json
 import logging
@@ -167,6 +168,34 @@ async def read_devices(session: ClientSession, origin: URL) -> dict[str, dict]:
     return devices
 
 
+def device_metadata(record: dict) -> dict[str, str]:
+    """Extract labels stored in both firmware metadata sections."""
+    info = record["device info"]
+    product = record.get("IR product info")
+    if not isinstance(product, dict):
+        product = {}
+    fields = {
+        "label": info.get("label"),
+        "device_type": info.get("type"),
+        "product": product.get("product"),
+        "manufacturer": product.get("vendor"),
+        "description": product.get("description"),
+    }
+    return {
+        key: value.strip() for key, value in fields.items()
+        if isinstance(value, str) and value.strip()
+    }
+
+
+def device_name_from_record(record: dict, device_id: str) -> str:
+    """Prefer the configured label, then usable product information."""
+    metadata = device_metadata(record)
+    for key in ("label", "product", "manufacturer", "device_type"):
+        if key in metadata:
+            return metadata[key]
+    return device_id
+
+
 async def send_action(
     session: ClientSession, origin: URL, device_id: str, action_id: str
 ) -> None:
@@ -190,19 +219,11 @@ async def _write_action(
             raise GatewayError(f"Gateway write failed (HTTP {response.status})")
 
 
-async def learn_code(
-    session: ClientSession,
-    origin: URL,
-    username: str,
-    password: str,
-    expected_mac: str,
-    *,
-    device_name: str = "",
-    button_name: str = "",
-    ir_output: int = 1,
-    existing_slot: int | None = None,
-) -> str:
-    """Learn a free slot and optionally save its button on the gateway."""
+@asynccontextmanager
+async def gateway_admin(
+    session: ClientSession, origin: URL, username: str, password: str, expected_mac: str
+):
+    """Verify the gateway and scope administrator authentication to one write."""
     origin = learning_origin(origin)
     if await identify_gateway(session, origin) != expected_mac:
         raise GatewayError("Gateway identity changed")
@@ -219,13 +240,37 @@ async def learn_code(
             raise GatewayError(f"Administrator login failed (HTTP {response.status})")
 
     try:
+        yield origin
+    finally:
+        try:
+            async with session.post(origin.with_path("/logout"), **request_options) as response:
+                if response.status != 200:
+                    _LOGGER.warning("iNELS IR logout returned HTTP %s", response.status)
+        except (ClientError, TimeoutError):
+            _LOGGER.warning("Could not close the iNELS IR administrator session")
+
+
+async def learn_code(
+    session: ClientSession,
+    origin: URL,
+    username: str,
+    password: str,
+    expected_mac: str,
+    *,
+    device_name: str = "",
+    button_name: str = "",
+    ir_output: int = 1,
+    existing_slot: int | None = None,
+) -> str:
+    """Learn a free slot and optionally save its button on the gateway."""
+    async with gateway_admin(session, origin, username, password, expected_mac) as origin:
         device_id = None
         existing = False
         if device_name:
             devices = await read_devices(session, origin)
             matches = [
                 key for key, device in devices.items()
-                if device["device info"].get("label") == device_name
+                if device_name_from_record(device, key) == device_name
             ]
             if len(matches) > 1:
                 raise GatewayError("More than one gateway device has that name")
@@ -251,13 +296,6 @@ async def learn_code(
                     f"IR slot {code} is stored. Check the gateway for the button before retrying."
                 ) from None
         return code
-    finally:
-        try:
-            async with session.post(origin.with_path("/logout"), **request_options) as response:
-                if response.status != 200:
-                    _LOGGER.warning("iNELS IR logout returned HTTP %s", response.status)
-        except (ClientError, TimeoutError):
-            _LOGGER.warning("Could not close the iNELS IR administrator session")
 
 
 def device_actions(device: dict) -> dict[str, str]:
@@ -294,10 +332,10 @@ async def _save_button(
         raise GatewayError("Gateway device changed during recording")
     if device_id in devices:
         device = devices[device_id]
-        if device["device info"].get("label") != device_name:
+        if device_name_from_record(device, device_id) != device_name:
             raise GatewayError("Gateway device changed during recording")
     else:
-        if any(d["device info"].get("label") == device_name for d in devices.values()):
+        if any(device_name_from_record(d, key) == device_name for key, d in devices.items()):
             raise GatewayError("Gateway device changed during recording")
         types = await _get_object(session, origin, "/api/configuration/device_types")
         if not types:
@@ -341,3 +379,94 @@ async def _record_code(session: ClientSession, origin: URL) -> str:
     if type(recorded) not in (str, int) or str(recorded) != str(slot):
         raise GatewayError(f"Gateway did not confirm IR recording in slot {slot}")
     return str(slot)
+
+
+async def _read_ir_device(session: ClientSession, origin: URL, device_id: str) -> dict:
+    device = await _get_object(session, origin, _device_path(device_id))
+    info = device.get("device info")
+    if (
+        device.get("id") != device_id
+        or not isinstance(info, dict)
+        or info.get("product type") != "IR"
+    ):
+        raise GatewayError("Unexpected device record")
+    return device
+
+
+async def update_remote(
+    session: ClientSession, origin: URL, device_id: str, changes: dict[str, str],
+) -> None:
+    """Preserve device ID, actions and any firmware fields outside the edit."""
+    device = await _read_ir_device(session, origin, device_id)
+    sections = {
+        "label": ("device info", "label"),
+        "device_type": ("device info", "type"),
+        "product": ("IR product info", "product"),
+        "manufacturer": ("IR product info", "vendor"),
+        "description": ("IR product info", "description"),
+    }
+    if "device_type" in changes:
+        types = await _get_object(session, origin, "/api/configuration/device_types")
+        if changes["device_type"] not in types:
+            raise GatewayError("This device type is not supported by the gateway")
+    for field, value in changes.items():
+        section, key = sections[field]
+        target = device.setdefault(section, {})
+        if not isinstance(target, dict):
+            raise GatewayError("Unexpected device metadata")
+        target[key] = value
+    await _write_action(session, origin, "POST", "/api/devices/", device)
+    saved = device_metadata(await _read_ir_device(session, origin, device_id))
+    if any(saved.get(field, "") != value for field, value in changes.items()):
+        raise GatewayError("Gateway did not confirm the device metadata")
+
+
+def _find_action(device: dict, action_id: str) -> tuple[dict, bool]:
+    primary = device.get("actions info", {})
+    if action_id in primary:
+        return primary, True
+    for group in device.get("secondary actions", []):
+        if action_id in group:
+            return group, False
+    raise GatewayError("Action was removed from the gateway")
+
+
+async def update_remote_action(
+    session: ClientSession,
+    origin: URL,
+    device_id: str,
+    action_id: str,
+    *,
+    label: str = "",
+    ir_output: int | None = None,
+    ir_slot: int | None = None,
+) -> None:
+    """Update an action using the same device record write as the vendor web UI."""
+    device = await _read_ir_device(session, origin, device_id)
+    labels = device_actions(device)
+    actions, primary = _find_action(device, action_id)
+    action = actions[action_id]
+    if not isinstance(action, dict):
+        raise GatewayError("Unexpected gateway action")
+    if label and any(
+        key != action_id and (label == key or label == value)
+        for key, value in labels.items()
+    ):
+        raise GatewayError("An action with that name already exists")
+    if ir_slot is not None:
+        if ir_slot not in await read_slots(session, origin):
+            raise GatewayError("That IR slot is no longer stored on the gateway")
+        action["ir codes"] = [ir_slot]
+    if ir_output is not None:
+        action["ir LED"] = ir_output
+    if label and label != labels[action_id]:
+        if primary:
+            actions[label] = actions.pop(action_id)
+            action_id = label
+        else:
+            action["label"] = label
+    await _write_action(session, origin, "POST", "/api/devices/", device)
+    saved = await _read_ir_device(session, origin, device_id)
+    saved_actions, _ = _find_action(saved, action_id)
+    if saved_actions[action_id] != action:
+        raise GatewayError("Gateway did not confirm the action update")

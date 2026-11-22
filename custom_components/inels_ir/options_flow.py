@@ -2,14 +2,16 @@
 
 import asyncio
 
+from aiohttp import ClientError
 import probatio as vol
 
 from homeassistant.config_entries import ConfigEntryState, OptionsFlow
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.const import CONF_MAC, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig, TextSelector
 
-from .api import DOMAIN
+from .api import DOMAIN, GatewayError, gateway_admin, gateway_session, update_remote, update_remote_action
+from .learning import valid_gateway_text
 
 
 class InelsIrOptionsFlow(OptionsFlow):
@@ -17,6 +19,7 @@ class InelsIrOptionsFlow(OptionsFlow):
 
     _task: asyncio.Task | None = None
     _error: str = ""
+    _device_id: str = ""
 
     async def async_step_init(self, user_input=None):
         entry = self.config_entry
@@ -27,6 +30,10 @@ class InelsIrOptionsFlow(OptionsFlow):
         choices = ["learn"]
         if entry.runtime_data.data.slots:
             choices.append("assign")
+        if entry.runtime_data.data.devices:
+            choices.append("edit_device")
+            if any(remote.actions for remote in entry.runtime_data.data.devices.values()):
+                choices.append("edit_action")
         return self.async_show_menu(step_id="init", menu_options=choices)
 
     async def async_step_learn(self, user_input=None):
@@ -62,8 +69,12 @@ class InelsIrOptionsFlow(OptionsFlow):
             )
 
         names = vol.Required if step_id == "assign" else vol.Optional
+        devices = sorted({device.name for device in self.config_entry.runtime_data.data.devices.values()})
         fields = {
-            names("device_name"): TextSelector(),
+            names("device_name"): (
+                SelectSelector(SelectSelectorConfig(options=devices, custom_value=True))
+                if devices else TextSelector()
+            ),
             names("button_name"): TextSelector(),
             vol.Optional("ir_output", default="1"): SelectSelector(
                 SelectSelectorConfig(options=["1", "2", "3"])
@@ -76,6 +87,116 @@ class InelsIrOptionsFlow(OptionsFlow):
                 )
             )
         return self.async_show_form(step_id=step_id, data_schema=vol.Schema(fields))
+
+    async def async_step_edit_device(self, user_input=None):
+        return await self._async_select_device("edit_device", user_input)
+
+    async def async_step_edit_action(self, user_input=None):
+        return await self._async_select_device("edit_action", user_input)
+
+    async def _async_select_device(self, step_id, user_input):
+        remotes = self.config_entry.runtime_data.data.devices
+        if user_input is not None:
+            self._device_id = user_input["device_id"]
+            if self._device_id not in remotes:
+                return self.async_abort(reason="gateway_unavailable")
+            if step_id == "edit_device":
+                return await self.async_step_device_metadata()
+            return await self.async_step_action_details()
+        options = [
+            {"value": key, "label": remote.name}
+            for key, remote in remotes.items()
+            if step_id != "edit_action" or remote.actions
+        ]
+        return self.async_show_form(
+            step_id=step_id,
+            data_schema=vol.Schema({
+                vol.Required("device_id"): SelectSelector(SelectSelectorConfig(options=options)),
+            }),
+        )
+
+    async def async_step_device_metadata(self, user_input=None):
+        remote = self.config_entry.runtime_data.data.devices.get(self._device_id)
+        if remote is None:
+            return self.async_abort(reason="gateway_unavailable")
+        fields = ("label", "product", "manufacturer", "description", "device_type")
+        errors = {}
+        if user_input is not None:
+            fields_to_update = {
+                key: value.strip() for key, value in user_input.items()
+                if key in fields and value.strip() != remote.metadata.get(key, "")
+            }
+            errors = {
+                key: "invalid_text" for key, value in fields_to_update.items()
+                if not valid_gateway_text(value)
+            }
+            if not errors:
+                if fields_to_update:
+                    return await self._async_write(update_remote, fields_to_update)
+                return await self.async_step_done()
+        schema = vol.Schema({
+            vol.Optional(field): TextSelector() for field in fields
+        })
+        return self.async_show_form(
+            step_id="device_metadata",
+            data_schema=self.add_suggested_values_to_schema(
+                schema, user_input if user_input is not None else remote.metadata
+            ),
+            errors=errors,
+        )
+
+    async def async_step_action_details(self, user_input=None):
+        catalog = self.config_entry.runtime_data.data
+        remote = catalog.devices.get(self._device_id)
+        if remote is None:
+            return self.async_abort(reason="gateway_unavailable")
+        errors = {}
+        if user_input is not None:
+            label = user_input.get("label", "").strip()
+            if not valid_gateway_text(label, action_key=True):
+                errors["label"] = "invalid_text"
+            else:
+                changes = {
+                    key: int(user_input[key]) for key in ("ir_slot", "ir_output")
+                    if key in user_input
+                }
+                return await self._async_write(
+                    update_remote_action, user_input["action_id"], label=label, **changes
+                )
+        fields = {
+            vol.Required("action_id"): SelectSelector(SelectSelectorConfig(options=[
+                {"value": key, "label": value} for key, value in remote.actions.items()
+            ])),
+            vol.Optional("label"): TextSelector(),
+            vol.Optional("ir_output"): SelectSelector(SelectSelectorConfig(options=["1", "2", "3"])),
+        }
+        if catalog.slots:
+            fields[vol.Optional("ir_slot")] = SelectSelector(
+                SelectSelectorConfig(options=[str(slot) for slot in catalog.slots])
+            )
+        return self.async_show_form(step_id="action_details", data_schema=vol.Schema(fields), errors=errors)
+
+    async def _async_write(self, operation, *args, **kwargs):
+        entry = self.config_entry
+        coordinator = entry.runtime_data
+        username = entry.data.get(CONF_USERNAME)
+        password = entry.data.get(CONF_PASSWORD)
+        mac = entry.data.get(CONF_MAC)
+        if not username or not password or not mac:
+            return self.async_abort(reason="credentials_required")
+        if entry.state != ConfigEntryState.LOADED or coordinator.lock.locked():
+            return self.async_abort(reason="gateway_unavailable")
+        try:
+            async with coordinator.lock, gateway_session() as session:
+                async with gateway_admin(session, coordinator.origin, username, password, mac) as origin:
+                    await operation(session, origin, self._device_id, *args, **kwargs)
+        except (ClientError, TimeoutError, ValueError, GatewayError) as err:
+            self._error = str(err) if isinstance(err, GatewayError) else type(err).__name__
+            return await self.async_step_failed()
+        finally:
+            if entry.state == ConfigEntryState.LOADED and entry.runtime_data is coordinator:
+                await coordinator.async_refresh()
+        return await self.async_step_done()
 
     async def async_step_done(self, user_input=None):
         return self.async_abort(reason="saved_on_gateway")

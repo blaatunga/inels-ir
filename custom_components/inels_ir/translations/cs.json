@@ -91,7 +91,9 @@
         "title": "Správa IR",
         "menu_options": {
           "learn": "Naučit nový IR kód",
-          "assign": "Vytvořit akci z uloženého kódu"
+          "assign": "Vytvořit akci z uloženého kódu",
+          "edit_device": "Upravit ovladač",
+          "edit_action": "Upravit tlačítko"
         }
       },
       "learn": {
@@ -111,6 +113,38 @@
           "ir_output": "IR výstup",
           "ir_slot": "Existující IR slot"
         }
+      },
+      "edit_device": {
+        "title": "Upravit ovladač",
+        "data": {
+          "device_id": "Ovladač"
+        }
+      },
+      "edit_action": {
+        "title": "Upravit tlačítko",
+        "data": {
+          "device_id": "Ovladač"
+        }
+      },
+      "device_metadata": {
+        "title": "Upravit ovladač",
+        "data": {
+          "label": "Název ovladače",
+          "product": "Produkt",
+          "manufacturer": "Výrobce",
+          "description": "Popis",
+          "device_type": "Typ zařízení"
+        }
+      },
+      "action_details": {
+        "title": "Upravit tlačítko",
+        "description": "Prázdná pole ponechají současné hodnoty. Výběr slotu nahradí stávající sekvenci jedním kódem. Přejmenování primární akce může ovlivnit scény krabičky a automatizace HA.",
+        "data": {
+          "action_id": "Tlačítko",
+          "label": "Nový název",
+          "ir_output": "Nový výstup IR",
+          "ir_slot": "Náhradní IR slot"
+        }
       }
     },
     "progress": {
@@ -122,6 +156,9 @@
       "credentials_required": "V nabídce integrace vyberte Přenastavit a zadejte účet správce krabičky.",
       "saved_on_gateway": "Uloženo do krabičky.",
       "gateway_operation_failed": "Krabička operaci nedokončila. {error}"
+    },
+    "error": {
+      "invalid_text": "Zadejte prostý text bez znaků HTML."
     }
   }
 }

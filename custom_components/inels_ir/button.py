@@ -45,15 +45,17 @@ async def async_setup_entry(
             unique_id = f"{entry.entry_id}_{slot}"
             current[unique_id] = (hub_info, None, str(slot), f"IR {slot}")
         current_device_ids = {hub.id}
-        for device_id, (name, actions) in catalog.devices.items():
+        for device_id, remote in catalog.devices.items():
             info = DeviceInfo(
                 identifiers={(DOMAIN, f"{device_prefix}{device_id}")},
-                name=name,
+                name=remote.name,
+                manufacturer=remote.metadata.get("manufacturer"),
+                model=remote.metadata.get("product"),
                 via_device_id=hub.id,
             )
             registered = devices.async_get_or_create(config_entry_id=entry.entry_id, **info)
             current_device_ids.add(registered.id)
-            for action_id, label in actions.items():
+            for action_id, label in remote.actions.items():
                 unique_id = f"{entry.entry_id}:action:{device_id}:{action_id}"
                 current[unique_id] = (info, device_id, action_id, label)
 
@@ -142,6 +144,9 @@ class InelsIrButton(CoordinatorEntity[GatewayCoordinator], ButtonEntity):
         self._attr_device_info = device_info
         self._attr_unique_id = unique_id
         self._attr_name = label
+        if device_id is None:
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
+            self._attr_entity_registry_visible_default = False
 
     @property
     def name(self) -> str:
@@ -149,15 +154,28 @@ class InelsIrButton(CoordinatorEntity[GatewayCoordinator], ButtonEntity):
         if self._device_id is not None:
             device = self.coordinator.data.devices.get(self._device_id)
             if device is not None:
-                return device[1].get(self._command_id, self._attr_name)
+                return device.actions.get(self._command_id, self._attr_name)
         return self._attr_name
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str] | None:
+        """Show firmware metadata in the details of each named button."""
+        if self._device_id is not None:
+            device = self.coordinator.data.devices.get(self._device_id)
+            if device is not None:
+                return {
+                    key: device.metadata[key]
+                    for key in ("description", "device_type")
+                    if key in device.metadata
+                }
+        return None
 
     def _still_configured(self) -> bool:
         catalog = self.coordinator.data
         if self._device_id is None:
             return self._slot in catalog.slots
         device = catalog.devices.get(self._device_id)
-        return device is not None and self._command_id in device[1]
+        return device is not None and self._command_id in device.actions
 
     async def async_press(self) -> None:
         try:

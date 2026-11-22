@@ -19,6 +19,16 @@ _LEGACY_OBJECT_KEYS = {
 }
 
 
+def valid_gateway_text(value: str, *, action_key: bool = False) -> bool:
+    """Accept text that the legacy web UI can render safely."""
+    return (
+        len(value) <= 80
+        and len(value.splitlines()) <= 1
+        and not any(ord(char) < 32 or char in "<>&\"'" for char in value)
+        and (not action_key or value not in _LEGACY_OBJECT_KEYS)
+    )
+
+
 def async_register_learning(hass: HomeAssistant) -> None:
     """Register the administrator action for learning a signal."""
 
@@ -38,12 +48,11 @@ def async_register_learning(hass: HomeAssistant) -> None:
         slot = call.data.get("ir_slot")
         if slot is not None and not (label and device):
             raise HomeAssistantError("Enter a device and action name for the selected slot")
-        if bool(label) != bool(device) or any(
-            len(name) > 80
-            or len(name.splitlines()) > 1
-            or any(ord(c) < 32 or c in "<>&\"'" for c in name)
-            for name in (label, device)
-        ) or label in _LEGACY_OBJECT_KEYS:
+        if (
+            bool(label) != bool(device)
+            or not valid_gateway_text(label, action_key=True)
+            or not valid_gateway_text(device)
+        ):
             raise HomeAssistantError(
                 "Use plain-text device and button names together, or leave both blank"
             )

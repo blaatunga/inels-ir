@@ -4,6 +4,8 @@
 
 Vlastní integrace pro ELKO EP **eLAN-IR-003**. Home Assistant automaticky načítá zařízení, jejich pojmenované akce a uložené IR sloty z krabičky. Pojmenovaná tlačítka spouštějí akce podle konfigurace krabičky, včetně nastaveného IR výstupu. Samotné sloty se zobrazují pod krabičkou jako tlačítka **IR 1**, **IR 2** a podobně. Úspěšná odpověď potvrzuje přijetí požadavku krabičkou. Stav televize nebo jiného ovládaného zařízení přes IR nelze zjistit.
 
+V HA je každý ovladač samostatné zařízení s pojmenovanými tlačítky. Název bere integrace z popisku ovladače nebo názvu produktu. Výrobce a produkt jsou v informacích o zařízení, typ a popis v atributech pojmenovaných tlačítek. Neoznačené sloty jsou diagnostické entity a při prvním vytvoření jsou skryté. Při vytváření akce jsou stále k dispozici ve výběru slotu.
+
 ## Instalace z GitHubu
 
 Vlastní kopii projektu uložte do veřejného GitHub repozitáře. Soubory `hacs.json` a `README.md` patří do kořene a integrace do `custom_components/inels_ir`. Na GitHub ukládejte soubory tohoto projektu. Přihlašovací údaje ke krabičce a konfiguraci zadávejte v Home Assistantu.
@@ -37,6 +39,8 @@ Po výměně složky integrace restartujte Home Assistant. V **Nastavení → Za
 3. Spusťte učení, namiřte ovladač na čidlo **IR LEARN** a stiskněte tlačítko. Krabička na nahrání čeká nejvýše 60 sekund. Integrace po zápisu načte aktuální katalog.
 
 Pokud je kód již uložený, ve stejném nastavení zvolte **Vytvořit akci z uloženého kódu**. Vyberte slot, pojmenujte spotřebič a tlačítko a zvolte výstup. Home Assistant akci uloží do krabičky a zpřístupní ji jako tlačítko. Tlačítko lze použít také v akci `button.press` na dashboardu nebo v automatizaci. Učení lze spustit i z **Nástroje pro vývojáře → Akce** pomocí `inels_ir.learn_code`.
+
+Ve stejném nastavení můžete zvolit **Upravit ovladač** nebo **Upravit tlačítko**. Úprava ovladače zachová jeho ID a existující akce. Změna výstupu ponechá původní IR sekvenci. Výběr náhradního slotu ji nahradí jedním kódem. Přejmenování primární akce mění její klíč v API a může vyžadovat změnu odkazů ve scénách krabičky nebo v automatizacích HA. U sekundární akce se mění popisek a klíč zůstává stejný.
 
 Heslo na krabičce změníte přes **Accounts** v jejím webovém rozhraní. Pak zadejte nové heslo v HA přes **Přenastavit**. Prázdné pole hesla při stejné adrese a stejném účtu ponechá uloženou hodnotu. Vymazáním obou polí uložené údaje odstraníte.
 
