@@ -28,6 +28,12 @@
       "confirm": {
         "title": "Add discovered gateway",
         "description": "Add iNELS IR at {host}?"
+      },
+      "choose_gateway": {
+        "title": "Discovered gateways",
+        "data": {
+          "host": "Gateway"
+        }
       }
     },
     "error": {
@@ -60,6 +66,9 @@
         },
         "ir_output": {
           "name": "IR output"
+        },
+        "ir_slot": {
+          "name": "Existing IR slot"
         }
       }
     }
@@ -74,6 +83,45 @@
   "exceptions": {
     "catalog_refresh_failed": {
       "message": "Could not read the catalog. Check that the gateway is reachable and try again."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "IR management",
+        "menu_options": {
+          "learn": "Learn a new IR code",
+          "assign": "Create an action from a stored code"
+        }
+      },
+      "learn": {
+        "title": "Learn a new IR code",
+        "description": "Leave both names blank to learn a slot only. Fill in both to create a named button.",
+        "data": {
+          "device_name": "Appliance name",
+          "button_name": "Button name",
+          "ir_output": "IR output"
+        }
+      },
+      "assign": {
+        "title": "Create an action from a stored code",
+        "data": {
+          "device_name": "Appliance name",
+          "button_name": "Button name",
+          "ir_output": "IR output",
+          "ir_slot": "Existing IR slot"
+        }
+      }
+    },
+    "progress": {
+      "learn": "Point your remote at IR LEARN and press a button. The gateway waits up to 60 seconds.",
+      "assign": "Saving the action to the gateway."
+    },
+    "abort": {
+      "gateway_unavailable": "The gateway is unavailable.",
+      "credentials_required": "Enter the gateway administrator credentials under Reconfigure.",
+      "saved_on_gateway": "Saved to the gateway.",
+      "gateway_operation_failed": "The gateway operation could not finish. {error}"
     }
   }
 }

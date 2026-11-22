@@ -200,6 +200,7 @@ async def learn_code(
     device_name: str = "",
     button_name: str = "",
     ir_output: int = 1,
+    existing_slot: int | None = None,
 ) -> str:
     """Learn a free slot and optionally save its button on the gateway."""
     origin = learning_origin(origin)
@@ -233,7 +234,12 @@ async def learn_code(
             if existing:
                 _check_new_action(devices[device_id], button_name)
 
-        code = await _record_code(session, origin)
+        if existing_slot is None:
+            code = await _record_code(session, origin)
+        else:
+            if existing_slot not in await read_slots(session, origin):
+                raise GatewayError("That IR slot is no longer stored on the gateway")
+            code = str(existing_slot)
         if device_id:
             try:
                 await _save_button(
@@ -242,7 +248,7 @@ async def learn_code(
                 )
             except (ClientError, TimeoutError, ValueError, GatewayError):
                 raise GatewayError(
-                    f"IR slot {code} was learned. Check the gateway for the button before retrying."
+                    f"IR slot {code} is stored. Check the gateway for the button before retrying."
                 ) from None
         return code
     finally:

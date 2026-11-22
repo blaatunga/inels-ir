@@ -16,7 +16,7 @@ Pro aktualizace můžete vydávat GitHub Releases s tagem odpovídajícím verzi
 
 ## Ruční instalace a první stisk
 
-Integrace je určená pro Home Assistant 2026.11 a novější. Krabička se může objevit v **Nastavení → Zařízení a služby → Nalezené** po události DHCP na síti, kterou HA vidí. Automatické nalezení ověřuje model a MAC adresu přes místní API a vyžaduje potvrzení. Ruční přidání podle IP adresy funguje i bez discovery. Změnu adresy potvrďte přes **Přenastavit**.
+Integrace je určená pro Home Assistant 2026.11 a novější. Krabička se může objevit v **Nastavení → Zařízení a služby → Nalezené** po události DHCP na síti, kterou HA vidí. Automatické nalezení ověřuje model a MAC adresu přes místní API a vyžaduje potvrzení. Při přidání integrace se nabídnou také ověřené krabičky z nedávných DHCP záznamů HA. Pokud HA krabičku v DHCP záznamech nemá, zadejte její IP ručně. Změnu adresy potvrďte přes **Přenastavit**.
 
 1. Ověřte označení modelu na štítku.
 2. Zkopírujte složku `custom_components/inels_ir` do složky `custom_components` vedle `configuration.yaml`. Výsledná cesta bývá `/config/custom_components/inels_ir/manifest.json`. Restartujte Home Assistant.
@@ -32,9 +32,11 @@ Po přechodu z verze 0.4.x se dřívější lokální přiřazení názvů a sku
 
 Po výměně složky integrace restartujte Home Assistant. V **Nastavení → Zařízení a služby → iNELS IR → Přenastavit** zadejte účet a heslo správce krabičky. Home Assistant je uloží v konfiguraci integrace. Do akce se zadávají jen údaje o tlačítku.
 
-1. V **Nástroje pro vývojáře → Akce** otevřete **iNELS IR: Naučit IR kód** (`inels_ir.learn_code`).
-2. Vyberte krabičku. Pro pojmenované tlačítko vyplňte název spotřebiče i tlačítka a zvolte výstup IR 1–3. Pokud názvy ponecháte prázdné, uloží se samotný IR slot.
-3. Spusťte akci, namiřte ovladač na čidlo **IR LEARN** a stiskněte tlačítko. Akce na nahrání čeká nejvýše 60 sekund. Krabička uloží signál a případné zařízení s tlačítkem. Integrace pak načte aktuální katalog. V odpovědi akce je i číslo slotu.
+1. V **Nastavení → Zařízení a služby → iNELS IR** otevřete nastavení konkrétní krabičky a zvolte **Naučit nový IR kód**.
+2. Pro pojmenované tlačítko vyplňte název spotřebiče i tlačítka a zvolte výstup IR 1–3. Pokud názvy ponecháte prázdné, uloží se samotný IR slot.
+3. Spusťte učení, namiřte ovladač na čidlo **IR LEARN** a stiskněte tlačítko. Krabička na nahrání čeká nejvýše 60 sekund. Integrace po zápisu načte aktuální katalog.
+
+Pokud je kód již uložený, ve stejném nastavení zvolte **Vytvořit akci z uloženého kódu**. Vyberte slot, pojmenujte spotřebič a tlačítko a zvolte výstup. Home Assistant akci uloží do krabičky a zpřístupní ji jako tlačítko. Tlačítko lze použít také v akci `button.press` na dashboardu nebo v automatizaci. Učení lze spustit i z **Nástroje pro vývojáře → Akce** pomocí `inels_ir.learn_code`.
 
 Heslo na krabičce změníte přes **Accounts** v jejím webovém rozhraní. Pak zadejte nové heslo v HA přes **Přenastavit**. Prázdné pole hesla při stejné adrese a stejném účtu ponechá uloženou hodnotu. Vymazáním obou polí uložené údaje odstraníte.
 

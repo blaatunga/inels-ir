@@ -1,11 +1,17 @@
 """Add and reconfigure an eLAN-IR-003 gateway."""
 
+import asyncio
+
 from aiohttp import ClientError
 import probatio as vol
 
 from homeassistant import config_entries
+from homeassistant.components.dhcp import async_discovered_service_info
+from homeassistant.core import callback
 from homeassistant.const import CONF_HOST, CONF_MAC, CONF_PASSWORD, CONF_USERNAME
-from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
+from homeassistant.helpers.selector import (
+    SelectSelector, SelectSelectorConfig, TextSelector, TextSelectorConfig, TextSelectorType,
+)
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
 from .api import (
@@ -17,13 +23,68 @@ from .api import (
     learning_origin,
 )
 
+from .options_flow import InelsIrOptionsFlow
+
 
 class InelsIrConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Configure the gateway without transmitting any IR codes."""
 
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry):
+        return InelsIrOptionsFlow()
+
+    _candidates: dict[str, DhcpServiceInfo]
+
     async def async_step_user(self, user_input=None):
-        """Add a gateway from the integrations screen."""
-        return await self._async_gateway_form("user", user_input)
+        """Offer known DHCP candidates even if HA saw them before installation."""
+        if user_input is not None:
+            return await self._async_gateway_form("user", user_input)
+        try:
+            seen = async_discovered_service_info(self.hass)
+        except KeyError:
+            seen = []
+        configured = self._async_current_entries()
+        candidates = [
+            item for item in seen
+            if item.macaddress.replace(":", "").lower().startswith("2c6a6f")
+            and not any(entry.data.get(CONF_MAC) == item.macaddress.replace(":", "").lower()
+                        for entry in configured)
+        ][:8]
+        verified = await asyncio.gather(*(self._async_verify_candidate(item) for item in candidates))
+        self._candidates = {
+            host: item for host, item in zip(verified, candidates, strict=True) if host is not None
+        }
+        if self._candidates:
+            return await self.async_step_choose_gateway()
+        return await self._async_gateway_form("user", None)
+
+    async def _async_verify_candidate(self, item: DhcpServiceInfo) -> str | None:
+        try:
+            address = str(item.ip)
+            origin = gateway_url(f"[{address}]" if ":" in address else address)
+            async with gateway_session() as session:
+                mac = await identify_gateway(session, origin)
+        except (ClientError, GatewayError, TimeoutError, ValueError):
+            return None
+        if mac == item.macaddress.replace(":", "").lower():
+            return str(origin)
+        return None
+
+    async def async_step_choose_gateway(self, user_input=None):
+        if user_input is not None:
+            selection = user_input[CONF_HOST]
+            if selection == "manual":
+                return await self._async_gateway_form("user", None)
+            return await self.async_step_dhcp(self._candidates[selection])
+        options = [{"value": host, "label": host} for host in self._candidates]
+        options.append({"value": "manual", "label": "IP / hostname"})
+        return self.async_show_form(
+            step_id="choose_gateway",
+            data_schema=vol.Schema({
+                vol.Required(CONF_HOST): SelectSelector(SelectSelectorConfig(options=options)),
+            }),
+        )
 
     async def async_step_reconfigure(self, user_input=None):
         """Edit the address or administrator credentials."""

@@ -28,6 +28,12 @@
       "confirm": {
         "title": "Přidat nalezenou krabičku",
         "description": "Přidat iNELS IR na adrese {host}?"
+      },
+      "choose_gateway": {
+        "title": "Nalezené krabičky",
+        "data": {
+          "host": "Krabička"
+        }
       }
     },
     "error": {
@@ -60,6 +66,9 @@
         },
         "ir_output": {
           "name": "IR výstup"
+        },
+        "ir_slot": {
+          "name": "Existující IR slot"
         }
       }
     }
@@ -74,6 +83,45 @@
   "exceptions": {
     "catalog_refresh_failed": {
       "message": "Katalog se nepodařilo načíst. Zkontrolujte dostupnost krabičky a zkuste to znovu."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Správa IR",
+        "menu_options": {
+          "learn": "Naučit nový IR kód",
+          "assign": "Vytvořit akci z uloženého kódu"
+        }
+      },
+      "learn": {
+        "title": "Naučit nový IR kód",
+        "description": "Pro samotný slot nechte název zařízení a akce prázdný. Pro pojmenované tlačítko vyplňte oba.",
+        "data": {
+          "device_name": "Název spotřebiče",
+          "button_name": "Název tlačítka",
+          "ir_output": "IR výstup"
+        }
+      },
+      "assign": {
+        "title": "Vytvořit akci z uloženého kódu",
+        "data": {
+          "device_name": "Název spotřebiče",
+          "button_name": "Název tlačítka",
+          "ir_output": "IR výstup",
+          "ir_slot": "Existující IR slot"
+        }
+      }
+    },
+    "progress": {
+      "learn": "Namiřte ovladač na IR LEARN a stiskněte tlačítko. Krabička čeká až 60 sekund.",
+      "assign": "Ukládám akci do krabičky."
+    },
+    "abort": {
+      "gateway_unavailable": "Krabička je nedostupná.",
+      "credentials_required": "V nabídce integrace vyberte Přenastavit a zadejte účet správce krabičky.",
+      "saved_on_gateway": "Uloženo do krabičky.",
+      "gateway_operation_failed": "Krabička operaci nedokončila. {error}"
     }
   }
 }

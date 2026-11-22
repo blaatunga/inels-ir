@@ -35,6 +35,9 @@ def async_register_learning(hass: HomeAssistant) -> None:
 
         label = call.data.get("button_name", "").strip()
         device = call.data.get("device_name", "").strip()
+        slot = call.data.get("ir_slot")
+        if slot is not None and not (label and device):
+            raise HomeAssistantError("Enter a device and action name for the selected slot")
         if bool(label) != bool(device) or any(
             len(name) > 80
             or len(name.splitlines()) > 1
@@ -59,6 +62,7 @@ def async_register_learning(hass: HomeAssistant) -> None:
                     device_name=device,
                     button_name=label,
                     ir_output=call.data["ir_output"],
+                    existing_slot=slot,
                 )
         except (ClientError, TimeoutError, ValueError, GatewayError) as err:
             detail = str(err) if isinstance(err, GatewayError) else type(err).__name__
@@ -78,6 +82,7 @@ def async_register_learning(hass: HomeAssistant) -> None:
             vol.Required("config_entry"): cv.string,
             vol.Optional("button_name"): cv.string,
             vol.Optional("device_name"): cv.string,
+            vol.Optional("ir_slot"): vol.All(int, vol.Range(min=1, max=200)),
             vol.Optional("ir_output", default=1): vol.All(int, vol.Range(min=1, max=3)),
         }),
         supports_response=SupportsResponse.OPTIONAL,
