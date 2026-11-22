@@ -6,7 +6,6 @@ from ipaddress import ip_address, ip_network
 import json
 import logging
 import re
-from uuid import uuid4
 
 from aiohttp import (
     ClientError,
@@ -265,7 +264,6 @@ async def learn_code(
     """Learn a free slot and optionally save its button on the gateway."""
     async with gateway_admin(session, origin, username, password, expected_mac) as origin:
         device_id = None
-        existing = False
         if device_name:
             devices = await read_devices(session, origin)
             matches = [
@@ -274,9 +272,8 @@ async def learn_code(
             ]
             if len(matches) > 1:
                 raise GatewayError("More than one gateway device has that name")
-            device_id = matches[0] if matches else f"ha-{uuid4().hex[:12]}"
-            existing = bool(matches)
-            if existing:
+            if matches:
+                device_id = matches[0]
                 _check_new_action(devices[device_id], button_name)
 
         if existing_slot is None:
@@ -285,11 +282,10 @@ async def learn_code(
             if existing_slot not in await read_slots(session, origin):
                 raise GatewayError("That IR slot is no longer stored on the gateway")
             code = str(existing_slot)
-        if device_id:
+        if device_name:
             try:
                 await _save_button(
                     session, origin, device_id, device_name, button_name, code, ir_output,
-                    existing=existing,
                 )
             except (ClientError, TimeoutError, ValueError, GatewayError):
                 raise GatewayError(
@@ -323,39 +319,30 @@ def _check_new_action(device: dict, button_name: str) -> None:
 
 
 async def _save_button(
-    session: ClientSession, origin: URL, device_id: str, device_name: str,
+    session: ClientSession, origin: URL, device_id: str | None, device_name: str,
     button_name: str, code: str, ir_output: int,
-    *, existing: bool,
 ) -> None:
     devices = await read_devices(session, origin)
-    if existing != (device_id in devices):
-        raise GatewayError("Gateway device changed during recording")
-    if device_id in devices:
+    if device_id is not None:
+        if device_id not in devices:
+            raise GatewayError("Gateway device was removed during recording")
         device = devices[device_id]
         if device_name_from_record(device, device_id) != device_name:
             raise GatewayError("Gateway device changed during recording")
+        device["id"] = device_id
     else:
         if any(device_name_from_record(d, key) == device_name for key, d in devices.items()):
             raise GatewayError("Gateway device changed during recording")
-        types = await _get_object(session, origin, "/api/configuration/device_types")
-        if not types:
-            raise GatewayError("Gateway returned no device types")
-        device = {
-            "device info": {
-                "type": "appliance" if "appliance" in types else next(iter(types)),
-                "product type": "IR",
-                "label": device_name,
-            },
-            "IR product info": {"product": "", "vendor": "", "description": ""},
-            "secondary actions": [],
-        }
+        device = await _new_remote(session, origin, {"label": device_name})
     _check_new_action(device, button_name)
-    device["id"] = device_id
     device.setdefault("actions info", {})[button_name] = {
         "type": None, "ir codes": [int(code)], "ir LED": ir_output,
     }
-    await _write_action(session, origin, "POST", "/api/devices/", device)
-    saved = await _get_object(session, origin, _device_path(device_id))
+    if device_id is None:
+        saved = await _write_new_remote(session, origin, devices, device)
+    else:
+        await _write_action(session, origin, "POST", "/api/devices/", device)
+        saved = await _read_ir_device(session, origin, device_id)
     actions = saved.get("actions info")
     if not isinstance(actions, dict) or actions.get(button_name) != device["actions info"][button_name]:
         raise GatewayError("Gateway did not confirm the saved button")
@@ -391,6 +378,56 @@ async def _read_ir_device(session: ClientSession, origin: URL, device_id: str) -
     ):
         raise GatewayError("Unexpected device record")
     return device
+
+
+async def _new_remote(
+    session: ClientSession, origin: URL, metadata: dict[str, str],
+) -> dict:
+    types = await _get_object(session, origin, "/api/configuration/device_types")
+    if not types:
+        raise GatewayError("Gateway returned no device types")
+    device_type = metadata.get("device_type") or (
+        "appliance" if "appliance" in types else next(iter(types))
+    )
+    if device_type not in types:
+        raise GatewayError("This device type is not supported by the gateway")
+    return {
+        "device info": {"type": device_type, "product type": "IR", "label": metadata["label"]},
+        "IR product info": {
+            "product": metadata.get("product", ""),
+            "vendor": metadata.get("manufacturer", ""),
+            "description": metadata.get("description", ""),
+        },
+        "actions info": {},
+        "secondary actions": [],
+    }
+
+
+async def create_remote(
+    session: ClientSession, origin: URL, metadata: dict[str, str],
+) -> None:
+    """Save a standalone remote on the gateway and verify it was created."""
+    devices = await read_devices(session, origin)
+    if any(device_name_from_record(device, key) == metadata["label"] for key, device in devices.items()):
+        raise GatewayError("A remote with that name already exists")
+    device = await _new_remote(session, origin, metadata)
+    await _write_new_remote(session, origin, devices, device)
+
+
+async def _write_new_remote(
+    session: ClientSession, origin: URL, before: dict[str, dict], device: dict,
+) -> dict:
+    """Let the firmware allocate the ID and verify the resulting record."""
+    await _write_action(session, origin, "POST", "/api/devices/", device)
+    after = await read_devices(session, origin)
+    label = device["device info"]["label"]
+    matches = [
+        key for key in after.keys() - before.keys()
+        if after[key]["device info"].get("label") == label
+    ]
+    if len(matches) != 1:
+        raise GatewayError("Gateway did not confirm the new remote")
+    return after[matches[0]]
 
 
 async def update_remote(

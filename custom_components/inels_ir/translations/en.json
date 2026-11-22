@@ -93,7 +93,8 @@
           "learn": "Learn a new IR code",
           "assign": "Create an action from a stored code",
           "edit_device": "Edit remote",
-          "edit_action": "Edit button"
+          "edit_action": "Edit button",
+          "create_device": "Add remote"
         }
       },
       "learn": {
@@ -103,7 +104,8 @@
           "device_name": "Appliance name",
           "button_name": "Button name",
           "ir_output": "IR output"
-        }
+        },
+        "submit": "Start learning"
       },
       "assign": {
         "title": "Create an action from a stored code",
@@ -112,7 +114,8 @@
           "button_name": "Button name",
           "ir_output": "IR output",
           "ir_slot": "Existing IR slot"
-        }
+        },
+        "submit": "Save action"
       },
       "edit_device": {
         "title": "Edit remote",
@@ -145,6 +148,18 @@
           "ir_output": "New IR output",
           "ir_slot": "Replacement IR slot"
         }
+      },
+      "create_device": {
+        "title": "Add remote",
+        "description": "After saving, learn a code or use a stored code to add buttons.",
+        "data": {
+          "label": "Remote name",
+          "product": "Product",
+          "manufacturer": "Manufacturer",
+          "description": "Description",
+          "device_type": "Device type"
+        },
+        "submit": "Add remote"
       }
     },
     "progress": {
@@ -158,7 +173,8 @@
       "gateway_operation_failed": "The gateway operation could not finish. {error}"
     },
     "error": {
-      "invalid_text": "Enter plain text without HTML characters."
+      "invalid_text": "Enter plain text without HTML characters.",
+      "name_required": "Enter a remote name."
     }
   }
 }

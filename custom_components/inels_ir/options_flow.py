@@ -9,8 +9,12 @@ from homeassistant.config_entries import ConfigEntryState, OptionsFlow
 from homeassistant.const import CONF_MAC, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig, TextSelector
+from homeassistant.helpers.translation import async_get_translations
 
-from .api import DOMAIN, GatewayError, gateway_admin, gateway_session, update_remote, update_remote_action
+from .api import (
+    DOMAIN, GatewayError, create_remote, gateway_admin, gateway_session, update_remote,
+    update_remote_action,
+)
 from .learning import valid_gateway_text
 
 
@@ -27,14 +31,47 @@ class InelsIrOptionsFlow(OptionsFlow):
             return self.async_abort(reason="gateway_unavailable")
         if not entry.data.get(CONF_USERNAME) or not entry.data.get(CONF_PASSWORD):
             return self.async_abort(reason="credentials_required")
-        choices = ["learn"]
+        choices = {"create_device": "Add remote", "learn": "Learn a new IR code"}
         if entry.runtime_data.data.slots:
-            choices.append("assign")
+            choices["assign"] = "Create an action from a stored code"
         if entry.runtime_data.data.devices:
-            choices.append("edit_device")
+            choices["edit_device"] = "Edit remote"
             if any(remote.actions for remote in entry.runtime_data.data.devices.values()):
-                choices.append("edit_action")
-        return self.async_show_menu(step_id="init", menu_options=choices)
+                choices["edit_action"] = "Edit button"
+        translations = await async_get_translations(
+            self.hass, self.hass.config.language, "options", (DOMAIN,)
+        )
+        return self.async_show_menu(
+            step_id="init",
+            menu_options={
+                step: translations.get(f"component.{DOMAIN}.options.step.init.menu_options.{step}")
+                or fallback
+                for step, fallback in choices.items()
+            },
+        )
+
+    async def async_step_create_device(self, user_input=None):
+        fields = ("label", "product", "manufacturer", "description", "device_type")
+        errors = {}
+        if user_input is not None:
+            metadata = {field: user_input.get(field, "").strip() for field in fields}
+            errors = {
+                field: "invalid_text" for field, value in metadata.items()
+                if not valid_gateway_text(value)
+            }
+            if not metadata["label"]:
+                errors["label"] = "name_required"
+            if not errors:
+                return await self._async_write(create_remote, metadata)
+        schema = vol.Schema({
+            (vol.Required if field == "label" else vol.Optional)(field): TextSelector()
+            for field in fields
+        })
+        return self.async_show_form(
+            step_id="create_device",
+            data_schema=self.add_suggested_values_to_schema(schema, user_input or {}),
+            errors=errors,
+        )
 
     async def async_step_learn(self, user_input=None):
         return await self._async_command_form("learn", user_input)
@@ -132,7 +169,7 @@ class InelsIrOptionsFlow(OptionsFlow):
             }
             if not errors:
                 if fields_to_update:
-                    return await self._async_write(update_remote, fields_to_update)
+                    return await self._async_write(update_remote, self._device_id, fields_to_update)
                 return await self.async_step_done()
         schema = vol.Schema({
             vol.Optional(field): TextSelector() for field in fields
@@ -161,7 +198,8 @@ class InelsIrOptionsFlow(OptionsFlow):
                     if key in user_input
                 }
                 return await self._async_write(
-                    update_remote_action, user_input["action_id"], label=label, **changes
+                    update_remote_action, self._device_id, user_input["action_id"],
+                    label=label, **changes,
                 )
         fields = {
             vol.Required("action_id"): SelectSelector(SelectSelectorConfig(options=[
@@ -189,7 +227,7 @@ class InelsIrOptionsFlow(OptionsFlow):
         try:
             async with coordinator.lock, gateway_session() as session:
                 async with gateway_admin(session, coordinator.origin, username, password, mac) as origin:
-                    await operation(session, origin, self._device_id, *args, **kwargs)
+                    await operation(session, origin, *args, **kwargs)
         except (ClientError, TimeoutError, ValueError, GatewayError) as err:
             self._error = str(err) if isinstance(err, GatewayError) else type(err).__name__
             return await self.async_step_failed()

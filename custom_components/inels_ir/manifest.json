@@ -11,5 +11,5 @@
   "documentation": "https://www.elkoep.cz/chytra-krabicka-elan-ir-003-/manual",
   "integration_type": "hub",
   "iot_class": "local_polling",
-  "version": "0.7.1"
+  "version": "0.7.2"
 }

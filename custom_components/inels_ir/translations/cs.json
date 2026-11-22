@@ -93,7 +93,8 @@
           "learn": "Naučit nový IR kód",
           "assign": "Vytvořit akci z uloženého kódu",
           "edit_device": "Upravit ovladač",
-          "edit_action": "Upravit tlačítko"
+          "edit_action": "Upravit tlačítko",
+          "create_device": "Přidat ovladač"
         }
       },
       "learn": {
@@ -103,7 +104,8 @@
           "device_name": "Název spotřebiče",
           "button_name": "Název tlačítka",
           "ir_output": "IR výstup"
-        }
+        },
+        "submit": "Spustit učení"
       },
       "assign": {
         "title": "Vytvořit akci z uloženého kódu",
@@ -112,7 +114,8 @@
           "button_name": "Název tlačítka",
           "ir_output": "IR výstup",
           "ir_slot": "Existující IR slot"
-        }
+        },
+        "submit": "Uložit akci"
       },
       "edit_device": {
         "title": "Upravit ovladač",
@@ -145,6 +148,18 @@
           "ir_output": "Nový výstup IR",
           "ir_slot": "Náhradní IR slot"
         }
+      },
+      "create_device": {
+        "title": "Přidat ovladač",
+        "description": "Po uložení přidejte tlačítka přes učení nebo z uloženého kódu.",
+        "data": {
+          "label": "Název ovladače",
+          "product": "Produkt",
+          "manufacturer": "Výrobce",
+          "description": "Popis",
+          "device_type": "Typ zařízení"
+        },
+        "submit": "Přidat ovladač"
       }
     },
     "progress": {
@@ -158,7 +173,8 @@
       "gateway_operation_failed": "Krabička operaci nedokončila. {error}"
     },
     "error": {
-      "invalid_text": "Zadejte prostý text bez znaků HTML."
+      "invalid_text": "Zadejte prostý text bez znaků HTML.",
+      "name_required": "Zadejte název ovladače."
     }
   }
 }

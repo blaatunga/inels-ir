@@ -1,5 +1,7 @@
 """Expose gateway IR slots and device actions as Home Assistant buttons."""
 
+from hashlib import blake2s
+
 from aiohttp import ClientError
 
 from homeassistant.components.button import ButtonEntity
@@ -11,9 +13,17 @@ from homeassistant.helpers import device_registry, entity_registry
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import slugify
 
 from .api import DOMAIN, GatewayError, gateway_session, send_action, send_code
 from .coordinator import GatewayCoordinator
+
+
+def _object_id_for(unique_id: str, label: str) -> str:
+    """Build the base Home Assistant uses for new and regenerated IDs."""
+    slug = slugify(label)[:48].strip("_") or "button"
+    suffix = blake2s(unique_id.encode("utf-8"), digest_size=4).hexdigest()
+    return f"{DOMAIN}_{slug}_{suffix}"
 
 
 async def async_setup_entry(
@@ -68,15 +78,21 @@ async def async_setup_entry(
                 continue
             if entity.unique_id not in current:
                 registry.async_remove(entity.entity_id)
-            elif current[entity.unique_id][1] is None and entity.device_id != hub.id:
-                registry.async_update_entity(
-                    entity.entity_id,
-                    device_id=hub.id,
-                    original_name=current[entity.unique_id][3],
-                )
-            elif entity.original_name != current[entity.unique_id][3]:
-                registry.async_update_entity(
-                    entity.entity_id, original_name=current[entity.unique_id][3]
+                continue
+            _, device_id, _, label = current[entity.unique_id]
+            object_id_base = _object_id_for(entity.unique_id, label)
+            registered_device_id = hub.id if device_id is None else entity.device_id
+            if (
+                entity.original_name != label
+                or entity.object_id_base != object_id_base
+                or entity.device_id != registered_device_id
+            ):
+                registry.async_get_or_create(
+                    "button", DOMAIN, entity.unique_id,
+                    config_entry=entry,
+                    device_id=registered_device_id,
+                    original_name=label,
+                    object_id_base=object_id_base,
                 )
         for device in device_registry.async_entries_for_config_entry(devices, entry.entry_id):
             if device.id not in current_device_ids and device.config_entry_id == entry.entry_id:
@@ -147,6 +163,11 @@ class InelsIrButton(CoordinatorEntity[GatewayCoordinator], ButtonEntity):
         if device_id is None:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
             self._attr_entity_registry_visible_default = False
+
+    @property
+    def suggested_object_id(self) -> str:
+        """Namespace new entity IDs while keeping a readable action name."""
+        return _object_id_for(self._attr_unique_id, self.name)
 
     @property
     def name(self) -> str:

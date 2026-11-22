@@ -42,6 +42,10 @@ Pokud je kód již uložený, ve stejném nastavení zvolte **Vytvořit akci z u
 
 Ve stejném nastavení můžete zvolit **Upravit ovladač** nebo **Upravit tlačítko**. Úprava ovladače zachová jeho ID a existující akce. Změna výstupu ponechá původní IR sekvenci. Výběr náhradního slotu ji nahradí jedním kódem. Přejmenování primární akce mění její klíč v API a může vyžadovat změnu odkazů ve scénách krabičky nebo v automatizacích HA. U sekundární akce se mění popisek a klíč zůstává stejný.
 
+Volba **Přidat ovladač** uloží nové zařízení přímo do krabičky. Tlačítka lze doplnit později učením nebo přiřazením uloženého slotu.
+
+ID nových tlačítek obsahují označení `inels_ir`, čitelnou část názvu a krátkou příponu odvozenou od identity tlačítka. Při změně názvu se ID existujícího tlačítka samo nemění. Po načtení konfigurace z krabičky lze obnovit navržené ID v nastavení entity nebo na stránce ovladače v nabídce **⋮ → Znovu vytvořit ID entit**. Home Assistant při tom zohlední aktuální názvy a případné vlastní přejmenování. Odkazy na původní ID zkontrolujte v automatizacích, skriptech a dashboardech.
+
 Heslo na krabičce změníte přes **Accounts** v jejím webovém rozhraní. Pak zadejte nové heslo v HA přes **Přenastavit**. Prázdné pole hesla při stejné adrese a stejném účtu ponechá uloženou hodnotu. Vymazáním obou polí uložené údaje odstraníte.
 
 Krabička používá nešifrované HTTP. Uložení do konfigurace HA omezuje šíření hesla přes parametry akcí, heslo je však součástí úložiště konfigurace i záloh HA. Učení vyžaduje privátní IP adresu a před přihlášením ověřuje model a uloženou MAC adresu. Údaje z API lze v místní síti podvrhnout. Krabičku používejte v důvěryhodné místní síti a nevystavujte její HTTP port do internetu.
